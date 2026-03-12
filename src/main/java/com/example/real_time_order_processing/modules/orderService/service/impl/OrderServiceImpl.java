@@ -4,6 +4,7 @@ import com.example.real_time_order_processing.auth.entity.UserInfo;
 import com.example.real_time_order_processing.auth.repository.UserInfoRepository;
 import com.example.real_time_order_processing.enums.OrderStatus;
 import com.example.real_time_order_processing.enums.PaymentStatus;
+import com.example.real_time_order_processing.kafka.PaymentCompleteDTO;
 import com.example.real_time_order_processing.kafka.PaymentEventDTO;
 import com.example.real_time_order_processing.modules.orderService.dto.OrderCreateDTO;
 import com.example.real_time_order_processing.modules.orderService.dto.OrderDTO;
@@ -112,16 +113,24 @@ public class OrderServiceImpl implements OrderService
         }
     }
     
+//    void orderCreatedKafkaEvent(Order order)
+//    {
+//        PaymentEventDTO paymentEventDTO = new PaymentEventDTO(order.getId(), order.getTotalAmount());
+//        kafkaTemplate.send(
+//                MessageBuilder
+//                        .withPayload(paymentEventDTO)
+//                        .setHeader(KafkaHeaders.TOPIC, "order-created")
+//                        .setHeader("__TypeId__", PaymentEventDTO.class.getName())
+//                        .build()
+//        );
+//    }
+
     void orderCreatedKafkaEvent(Order order)
     {
-        PaymentEventDTO paymentEventDTO = new PaymentEventDTO(order.getId(), order.getTotalAmount());
-        kafkaTemplate.send(
-                MessageBuilder
-                        .withPayload(paymentEventDTO)
-                        .setHeader(KafkaHeaders.TOPIC, "order-created")
-                        .setHeader("__TypeId__", PaymentEventDTO.class.getName())
-                        .build()
-        );
+        PaymentEventDTO paymentEventDTO =
+                new PaymentEventDTO(order.getId(), order.getTotalAmount());
+
+        kafkaTemplate.send("order-created", paymentEventDTO);
     }
 
     @Override
@@ -187,6 +196,16 @@ public class OrderServiceImpl implements OrderService
         {
             throw new RuntimeException("An error occurred while canceling the order.", e);
         }
+    }
+
+    @Override
+    public void paymentStatus(PaymentCompleteDTO dto)
+    {
+        Order order = orderRepository.findById(dto.getOrderId())
+                .orElseThrow(() -> new ResourceNotFoundException("No order found with the specified ID."));
+
+        order.setPaymentStatus(dto.getPaymentStatus());
+        orderRepository.save(order);
     }
 
     private Double calculateTotalAmount(List<OrderItemDTO> dtoList)

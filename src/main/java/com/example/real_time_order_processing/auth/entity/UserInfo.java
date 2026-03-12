@@ -17,8 +17,8 @@ public class UserInfo
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "name")
-    private String name;
+    @Column(name = "username")
+    private String userName;
 
     @Column(name = "email")
     private String email;

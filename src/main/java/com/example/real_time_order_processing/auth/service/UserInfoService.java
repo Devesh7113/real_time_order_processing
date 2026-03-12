@@ -45,7 +45,7 @@ public class UserInfoService implements UserDetailsService
 
     public String addUser(UserInfo userInfo)
     {
-        Optional<UserInfo> optionalUserInfo = userInfoRepository.findByNameOrEmail(userInfo.getName(), userInfo.getEmail());
+        Optional<UserInfo> optionalUserInfo = userInfoRepository.findByEmail(userInfo.getEmail());
 
         if(optionalUserInfo.isPresent())
         {

@@ -1,5 +1,6 @@
 package com.example.real_time_order_processing.modules.orderService.service;
 
+import com.example.real_time_order_processing.kafka.PaymentCompleteDTO;
 import com.example.real_time_order_processing.modules.orderService.dto.OrderCreateDTO;
 import com.example.real_time_order_processing.modules.orderService.dto.OrderDTO;
 import com.example.real_time_order_processing.modules.orderService.dto.OrderItemDTO;
@@ -20,4 +21,6 @@ public interface OrderService
     void updateOder(OrderUpdateDTO dto);
 
     void deleteOrder(Long id);
+
+    void paymentStatus(PaymentCompleteDTO dto);
 }
