@@ -1,5 +1,6 @@
 package com.example.real_time_order_processing.kafka;
 
+import com.example.real_time_order_processing.modules.orderService.dto.InventoryProcessResponse;
 import com.example.real_time_order_processing.modules.orderService.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -7,18 +8,16 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class PaymentKafkaListener
+public class InventoryKafkaListener
 {
     private final OrderService orderService;
 
     @KafkaListener(
-            topics = "payment-completed",
-            groupId = "payment-service-group",
-            containerFactory = "paymentKafkaListenerContainerFactory"
+            topics = "inventory-process-completed",
+            containerFactory = "inventoryKafkaListenerContainerFactory"
     )
-    public void onPaymentEvent(PaymentCompleteDTO event)
+    public void onInventoryProcessComplete(InventoryProcessResponse response)
     {
-        System.out.println("Received payment event: " + event);
-        orderService.paymentStatus(event);
+        orderService.processInventoryResponse(response);
     }
 }

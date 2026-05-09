@@ -5,32 +5,32 @@ import com.example.real_time_order_processing.auth.repository.UserInfoRepository
 import com.example.real_time_order_processing.enums.OrderStatus;
 import com.example.real_time_order_processing.enums.PaymentStatus;
 import com.example.real_time_order_processing.kafka.PaymentCompleteDTO;
-import com.example.real_time_order_processing.kafka.PaymentEventDTO;
-import com.example.real_time_order_processing.modules.orderService.dto.OrderCreateDTO;
-import com.example.real_time_order_processing.modules.orderService.dto.OrderDTO;
-import com.example.real_time_order_processing.modules.orderService.dto.OrderItemDTO;
-import com.example.real_time_order_processing.modules.orderService.dto.OrderUpdateDTO;
+import com.example.real_time_order_processing.modules.orderService.dto.*;
 import com.example.real_time_order_processing.modules.orderService.entity.Order;
 import com.example.real_time_order_processing.modules.orderService.entity.OrderItem;
 import com.example.real_time_order_processing.modules.orderService.repository.OrderItemRepository;
 import com.example.real_time_order_processing.modules.orderService.repository.OrderRepository;
 import com.example.real_time_order_processing.modules.orderService.service.OrderService;
+import com.example.real_time_order_processing.modules.productService.entity.Product;
+import com.example.real_time_order_processing.modules.productService.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.errors.ResourceNotFoundException;
 import org.apache.tomcat.websocket.AuthenticationException;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.KafkaHeaders;
-import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService
@@ -40,6 +40,8 @@ public class OrderServiceImpl implements OrderService
     private final OrderItemRepository orderItemRepository;
 
     private final UserInfoRepository userInfoRepository;
+
+    private final ProductRepository productRepository;
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
@@ -63,15 +65,43 @@ public class OrderServiceImpl implements OrderService
     {
         try
         {
-            Optional<OrderDTO> orderOptional = orderRepository.findByOrderId(orderId);
-            if(orderOptional.isEmpty())
+            Long userId = getCurrentUserId();
+            Order orderEntity = orderRepository.findById(orderId)
+                    .orElseThrow(() -> new ResourceNotFoundException("No order found with this order id " + orderId));
+            if (!orderEntity.getUserId().equals(userId))
             {
                 throw new ResourceNotFoundException("No order found with this order id " + orderId);
             }
 
-            OrderDTO orderDTO = orderOptional.get();
+            return orderItemRepository.findByOrderIdAsDto(orderId);
+        }
+        catch (ResourceNotFoundException e)
+        {
+            throw e;
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException("An error occurred while fetching the order.", e);
+        }
+    }
 
-            return orderItemRepository.findByOrderIdAsDto(orderDTO.getId());
+    @Override
+    public Order requireOrderForCurrentUser(Long orderId)
+    {
+        try
+        {
+            Long userId = getCurrentUserId();
+            Order orderEntity = orderRepository.findById(orderId)
+                    .orElseThrow(() -> new ResourceNotFoundException("No order found with this order id " + orderId));
+            if (!orderEntity.getUserId().equals(userId))
+            {
+                throw new ResourceNotFoundException("No order found with this order id " + orderId);
+            }
+            return orderEntity;
+        }
+        catch (ResourceNotFoundException e)
+        {
+            throw e;
         }
         catch (Exception e)
         {
@@ -81,7 +111,7 @@ public class OrderServiceImpl implements OrderService
 
     @Override
     @Transactional
-    public void createOrder(OrderCreateDTO dto)
+    public Long createOrder(OrderCreateDTO dto)
     {
         try
         {
@@ -89,112 +119,106 @@ public class OrderServiceImpl implements OrderService
             order.setUserId(getCurrentUserId());
 
             List<OrderItem> orderItemList = mapOrderItems(dto.getOrderItems());
-            for(OrderItem orderItemDTO : orderItemList)
+            for (OrderItem orderItemDTO : orderItemList)
             {
                 orderItemDTO.setOrder(order);
             }
             order.setOrderItems(orderItemList);
 
             order.setTotalAmount(calculateTotalAmount(dto.getOrderItems()));
-            order.setOrderStatus(OrderStatus.NEW);
+            order.setOrderStatus(OrderStatus.PROCESSING);
             order.setPaymentStatus(PaymentStatus.PENDING);
             order.setShippingAddress(dto.getShippingAddress());
-            order.setBillingAddress(dto.getBillingAddress());
-            order.setPaymentMethod(dto.getPaymentMethod());
             order.setNotes(dto.getNotes());
 
             orderRepository.save(order);
 
-            orderCreatedKafkaEvent(order);
+            List<InventoryProcessRequestData> productList = orderItemList.stream()
+                    .map(item -> {
+                        InventoryProcessRequestData check = new InventoryProcessRequestData();
+                        check.setProductId(item.getProductId());
+                        check.setQuantity(item.getQuantity());
+                        return check;
+                    })
+                    .toList();
+            processInventory(new InventoryProcessRequest(order.getId(), productList));
+
+            return order.getId();
         }
         catch (Exception e)
         {
             throw new RuntimeException("An error occurred while creating the order.", e);
         }
     }
-    
-//    void orderCreatedKafkaEvent(Order order)
-//    {
-//        PaymentEventDTO paymentEventDTO = new PaymentEventDTO(order.getId(), order.getTotalAmount());
-//        kafkaTemplate.send(
-//                MessageBuilder
-//                        .withPayload(paymentEventDTO)
-//                        .setHeader(KafkaHeaders.TOPIC, "order-created")
-//                        .setHeader("__TypeId__", PaymentEventDTO.class.getName())
-//                        .build()
-//        );
-//    }
 
-    void orderCreatedKafkaEvent(Order order)
+    void processInventory(InventoryProcessRequest productList)
     {
-        PaymentEventDTO paymentEventDTO =
-                new PaymentEventDTO(order.getId(), order.getTotalAmount());
-
-        kafkaTemplate.send("order-created", paymentEventDTO);
+        kafkaTemplate.send("process-inventory", productList);
     }
 
-    @Override
-    public void updateOder(OrderUpdateDTO dto)
+    public void processInventoryResponse(InventoryProcessResponse productList)
     {
-        try
+        Optional<Order> orderOptional = orderRepository.findById(productList.getOrderId());
+        if (orderOptional.isEmpty())
         {
-            Optional<Order> dtoOptional = orderRepository.findById(dto.getId());
-
-            if(dtoOptional.isEmpty())
-            {
-                throw new ResourceNotFoundException("No order found with the specified ID.");
-            }
-
-            Order order = dtoOptional.get();
-
-            if(order.getOrderStatus() == OrderStatus.InTransit)
-            {
-                throw new RuntimeException("Order is currently In Transit and cannot be updated.");
-            }
-
-
-//            order.setOrderItems(mapOrderItems(dto.getOrderItems()));
-//            order.setTotalAmount(calculateTotalAmount(dto.getOrderItems()));
-//            order.setOrderStatus(OrderStatus.NEW);
-//            order.setPaymentStatus(PaymentStatus.PENDING);
-            order.setShippingAddress(dto.getShippingAddress());
-//            order.setBillingAddress(dto.getBillingAddress());
-//            order.setPaymentMethod(dto.getPaymentMethod());
-            order.setNotes(dto.getNotes());
-
-            orderRepository.save(order);
+            log.error("No order found with this order id in processInventoryResponse " + productList.getOrderId());
+            return;
         }
-        catch (Exception e)
+
+        Order order = orderOptional.get();
+        OrderStatus orderStatus = OrderStatus.CONFIRMED;
+        for(InventoryProcessResponseData data : productList.getProductList())
         {
-            throw new RuntimeException("An error occurred while updating the order.", e);
+            if(Boolean.FALSE.equals(data.getAvailable()))
+            {
+                orderStatus = OrderStatus.ACTION_NEEDED;
+            }
         }
+
+        order.setOrderStatus(orderStatus);
+        orderRepository.save(order);
     }
 
     @Override
     @Transactional
-    public void deleteOrder(Long id)
+    public void updateOder(OrderUpdateDTO dto)
     {
         try
         {
-            Optional<Order> orderOptional = orderRepository.findById(id);
+            Long userId = getCurrentUserId();
+            Order order = orderRepository.findById(dto.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("No order found with the specified ID."));
 
-            if(orderOptional.isEmpty())
+            if (!order.getUserId().equals(userId))
             {
-                throw new ResourceNotFoundException(("No order found with the specified ID."));
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot update this order.");
+            }
+            if (order.isCustomerEditUsed())
+            {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "This order has already been edited once.");
+            }
+            if (isOrderLockedForAddressUpdate(order.getOrderStatus()))
+            {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "This order cannot be updated in its current status.");
             }
 
-            Order order = orderOptional.get();
-
-            if(order.getOrderStatus() == OrderStatus.InTransit)
+            String ship = dto.getShippingAddress() != null ? dto.getShippingAddress().trim() : "";
+            if (ship.isBlank())
             {
-                throw new RuntimeException("Order is currently In Transit and cannot be canceled.");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Shipping address is required.");
             }
 
-            orderRepository.deleteById(id);
+            order.setShippingAddress(ship);
+            order.setCustomerEditUsed(true);
+            orderRepository.save(order);
+        }
+        catch (ResponseStatusException | ResourceNotFoundException e)
+        {
+            throw e;
         }
         catch (Exception e)
         {
-            throw new RuntimeException("An error occurred while canceling the order.", e);
+            throw new RuntimeException("An error occurred while updating the order.", e);
         }
     }
 
@@ -218,6 +242,18 @@ public class OrderServiceImpl implements OrderService
         }
 
         return totalAmount;
+    }
+
+    private static double calculateTotalAmountFromOrderItems(List<OrderItem> list)
+    {
+        double total = 0.0;
+        for (OrderItem oi : list)
+        {
+            double price = oi.getPrice() != null ? oi.getPrice() : 0.0;
+            long qty = oi.getQuantity() != null ? oi.getQuantity() : 0L;
+            total += price * qty;
+        }
+        return total;
     }
 
     private List<OrderItem> mapOrderItems(List<OrderItemDTO> orderItemDTOList)
@@ -248,6 +284,14 @@ public class OrderServiceImpl implements OrderService
                 .collect(Collectors.toList());
     }
 
+
+    /** Address updates only while order is not in terminal / shipped state. */
+    private static boolean isOrderLockedForAddressUpdate(OrderStatus status)
+    {
+        return status == OrderStatus.IN_TRANSIT
+                || status == OrderStatus.SHIPPED
+                || status == OrderStatus.CANCELLED;
+    }
 
     private Long getCurrentUserId() throws AuthenticationException
     {

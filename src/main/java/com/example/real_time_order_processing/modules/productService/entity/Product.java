@@ -45,4 +45,7 @@ public class Product
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "reserved_quantity")
+    private Integer reservedQuantity;
 }

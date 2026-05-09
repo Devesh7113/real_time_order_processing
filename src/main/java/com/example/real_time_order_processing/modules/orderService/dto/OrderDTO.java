@@ -2,7 +2,6 @@ package com.example.real_time_order_processing.modules.orderService.dto;
 
 import com.example.real_time_order_processing.enums.OrderStatus;
 import com.example.real_time_order_processing.enums.PaymentStatus;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -10,7 +9,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
 public class OrderDTO
 {
@@ -23,12 +21,13 @@ public class OrderDTO
     private LocalDateTime updatedAt;
     private PaymentStatus paymentStatus;
     private String shippingAddress;
-    private String billingAddress;
-    private String paymentMethod;
     private String notes;
 
+    private Boolean customerEditUsed;
+
     public OrderDTO(Long id, Long userId, Double totalAmount, OrderStatus orderStatus, LocalDateTime createdAt, LocalDateTime updatedAt,
-                    PaymentStatus paymentStatus, String shippingAddress, String billingAddress, String paymentMethod, String notes)
+                    PaymentStatus paymentStatus, String shippingAddress, String notes,
+                    Boolean customerEditUsed)
     {
         this.id = id;
         this.userId = userId;
@@ -38,9 +37,8 @@ public class OrderDTO
         this.updatedAt = updatedAt;
         this.paymentStatus = paymentStatus;
         this.shippingAddress = shippingAddress;
-        this.billingAddress = billingAddress;
-        this.paymentMethod = paymentMethod;
         this.notes = notes;
+        this.customerEditUsed = customerEditUsed;
         this.orderItems = null;
     }
 }

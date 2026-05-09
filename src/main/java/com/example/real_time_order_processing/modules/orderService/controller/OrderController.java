@@ -1,5 +1,6 @@
 package com.example.real_time_order_processing.modules.orderService.controller;
 
+import com.example.real_time_order_processing.modules.orderService.dto.OrderCreateResponseDTO;
 import com.example.real_time_order_processing.modules.orderService.dto.OrderCreateDTO;
 import com.example.real_time_order_processing.modules.orderService.dto.OrderDTO;
 import com.example.real_time_order_processing.modules.orderService.dto.OrderUpdateDTO;
@@ -29,6 +30,7 @@ public class OrderController
         try
         {
             List<ProductDTO> productDTOList = productService.getAllProducts();
+            productDTOList.forEach(p -> p.setStockQuantity(null));
 
             return ResponseEntity.ok(productDTOList);
         }
@@ -69,8 +71,11 @@ public class OrderController
     {
         try
         {
-            orderService.createOrder(dto);
-            return ResponseEntity.ok("Your order has been placed successfully.");
+            Long orderId = orderService.createOrder(dto);
+            return ResponseEntity.ok(new OrderCreateResponseDTO(
+                    "Your order has been placed successfully.",
+                    orderId
+            ));
         }
         catch (Exception e)
         {
@@ -85,20 +90,6 @@ public class OrderController
         {
             orderService.updateOder(dto);
             return ResponseEntity.ok("Your order has been updated successfully.");
-        }
-        catch (Exception e)
-        {
-            return ExceptionUtils.handleException(e);
-        }
-    }
-
-    @DeleteMapping
-    ResponseEntity<?> deleteOder(Long id)
-    {
-        try
-        {
-            orderService.deleteOrder(id);
-            return ResponseEntity.ok("Your order has been deleted successfully.");
         }
         catch (Exception e)
         {

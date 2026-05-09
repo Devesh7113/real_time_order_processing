@@ -5,12 +5,14 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -19,10 +21,18 @@ public class JwtService
 {
     private static final String SECRET = "j4F7xP9qLmB2zT8wR6sQ1vN0yH5kC3uD7eX9pL4rA2wS8mF6tH9bG3cZ1vE5";
 
-    public String generateToken(String email)
+    public String generateToken(UserDetails userDetails)
     {
         Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, email);
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .toList();
+        claims.put("roles", roles);
+        if (userDetails instanceof UserInfoDetails userInfoDetails)
+        {
+            claims.put("displayName", userInfoDetails.getDisplayName());
+        }
+        return createToken(claims, userDetails.getUsername());
     }
 
     private String createToken(Map<String, Object> claims, String email)
@@ -31,7 +41,7 @@ public class JwtService
                 .setClaims(claims)
                 .setSubject(email)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 30))
+                .setExpiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24))
                 .signWith(getSignKey(),
                         SignatureAlgorithm.HS256)
                 .compact();

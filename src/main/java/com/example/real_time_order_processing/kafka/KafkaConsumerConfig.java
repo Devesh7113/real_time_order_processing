@@ -1,7 +1,6 @@
 package com.example.real_time_order_processing.kafka;
 
-import com.example.real_time_order_processing.modules.orderService.dto.OrderDTO;
-import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.example.real_time_order_processing.modules.orderService.dto.InventoryProcessResponse;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.context.annotation.Bean;
@@ -9,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.support.serializer.JsonDeserializer;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -17,25 +17,25 @@ import java.util.Map;
 public class KafkaConsumerConfig
 {
     @Bean
-    public ConsumerFactory<String, OrderDTO> orderConsumerFactory()
+    public ConsumerFactory<String, InventoryProcessResponse> inventoryConsumerFactory()
     {
-        Map<String, Object> config = new HashMap<>();
-        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-        config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-        config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "order-service-inventory");
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
-        config.put("spring.json.trusted.packages", "com.example.real_time_order_processing.*");
-        config.put("spring.json.value.default.type", "com.example.real_time_order_processing.dto.OrderDTO");
+        JsonDeserializer<InventoryProcessResponse> valueDeserializer = new JsonDeserializer<>(InventoryProcessResponse.class);
+        valueDeserializer.addTrustedPackages("com.example.real_time_order_processing");
 
-        return new DefaultKafkaConsumerFactory<>(config);
+        return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), valueDeserializer);
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, OrderDTO> orderKafkaListenerContainerFactory()
+    public ConcurrentKafkaListenerContainerFactory<String, InventoryProcessResponse> inventoryKafkaListenerContainerFactory()
     {
-        ConcurrentKafkaListenerContainerFactory<String, OrderDTO> factory = new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(orderConsumerFactory());
+        ConcurrentKafkaListenerContainerFactory<String, InventoryProcessResponse> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(inventoryConsumerFactory());
         return factory;
     }
 }

@@ -48,17 +48,15 @@ public class Order
     private LocalDateTime updatedAt;
 
     @Column(name = "payment_status")
+    @Enumerated(EnumType.STRING)
     private PaymentStatus paymentStatus;
 
     @Column(name = "shipping_address")
     private String shippingAddress;
 
-    @Column(name = "billing_address")
-    private String billingAddress;
-
-    @Column(name = "payment_method")
-    private String paymentMethod;
-
     @Column(name = "notes")
     private String notes;
+
+    @Column(name = "customer_edit_used", nullable = false)
+    private boolean customerEditUsed = false;
 }

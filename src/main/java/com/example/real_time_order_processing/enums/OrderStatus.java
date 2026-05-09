@@ -4,7 +4,9 @@ public enum OrderStatus
 {
     NEW,
     PROCESSING,
-    InTransit,
+    CONFIRMED,
+    ACTION_NEEDED,
+    IN_TRANSIT,
     CANCELLED,
-    SHIPPED
+    SHIPPED;
 }

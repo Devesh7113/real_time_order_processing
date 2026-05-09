@@ -4,7 +4,6 @@ import com.example.real_time_order_processing.auth.entity.UserInfo;
 import com.example.real_time_order_processing.auth.repository.UserInfoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -14,7 +13,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -35,10 +33,7 @@ public class UserInfoService implements UserDetailsService
 
         UserInfo user = userInfo.get();
 
-        List<GrantedAuthority> authorities = List.of(user.getRoles().split(","))
-                .stream()
-                .map(SimpleGrantedAuthority::new)
-                .collect(Collectors.toList());
+        List<GrantedAuthority> authorities = RoleAuthorityMapper.fromRolesCsv(user.getRoles());
 
         return new User(user.getEmail(), user.getPassword(), authorities);
     }
