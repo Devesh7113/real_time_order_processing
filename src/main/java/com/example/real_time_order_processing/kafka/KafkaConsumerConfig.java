@@ -3,6 +3,7 @@ package com.example.real_time_order_processing.kafka;
 import com.example.real_time_order_processing.modules.orderService.dto.InventoryProcessResponse;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
@@ -17,10 +18,8 @@ import java.util.Map;
 public class KafkaConsumerConfig
 {
     @Bean
-    public ConsumerFactory<String, InventoryProcessResponse> inventoryConsumerFactory()
-    {
-        Map<String, Object> props = new HashMap<>();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+    public ConsumerFactory<String, InventoryProcessResponse> inventoryConsumerFactory(KafkaProperties kafkaProperties) {
+        Map<String, Object> props = new HashMap<>(kafkaProperties.buildConsumerProperties(null));
         props.put(ConsumerConfig.GROUP_ID_CONFIG, "order-service-inventory");
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
@@ -31,11 +30,11 @@ public class KafkaConsumerConfig
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, InventoryProcessResponse> inventoryKafkaListenerContainerFactory()
-    {
+    public ConcurrentKafkaListenerContainerFactory<String, InventoryProcessResponse> inventoryKafkaListenerContainerFactory(
+            ConsumerFactory<String, InventoryProcessResponse> inventoryConsumerFactory) {
         ConcurrentKafkaListenerContainerFactory<String, InventoryProcessResponse> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(inventoryConsumerFactory());
+        factory.setConsumerFactory(inventoryConsumerFactory);
         return factory;
     }
 }

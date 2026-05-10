@@ -1,7 +1,6 @@
 package com.example.real_time_order_processing.auth.controller;
 
 import com.example.real_time_order_processing.auth.request.AuthRequest;
-import com.example.real_time_order_processing.auth.entity.UserInfo;
 import com.example.real_time_order_processing.auth.service.JwtService;
 import com.example.real_time_order_processing.auth.service.UserInfoService;
 import lombok.RequiredArgsConstructor;
@@ -11,8 +10,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -32,9 +33,10 @@ public class UserController
     }
 
     @PostMapping("/addNewUser")
-    public String addNewUser(@RequestBody UserInfo userInfo)
+    public String addNewUser(/* restore: @RequestBody UserInfo userInfo */)
     {
-        return userInfoService.addUser(userInfo);
+        // return userInfoService.addUser(userInfo);
+        throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "This functionality is currently unavailable.");
     }
 
 
