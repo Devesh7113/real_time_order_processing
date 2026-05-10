@@ -10,7 +10,7 @@ import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long>
 {
-    @Query("SELECT new com.example.real_time_order_processing.modules.productService.dto.ProductDTO(p.id, p.name, p.description, p.price, p.stockQuantity, p.category, p.imageUrl) FROM Product p")
+    @Query("SELECT new com.example.real_time_order_processing.modules.productService.dto.ProductDTO(p.id, p.name, p.description, p.price, p.stockQuantity, p.reservedQuantity, p.category, p.imageUrl) FROM Product p")
     List<ProductDTO> findAllProduct();
 
     Optional<Product> findBySku(String sku);

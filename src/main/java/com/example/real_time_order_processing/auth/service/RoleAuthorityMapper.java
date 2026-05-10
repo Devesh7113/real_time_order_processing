@@ -4,6 +4,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -33,6 +34,28 @@ public final class RoleAuthorityMapper
                 .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toList());
         return list.isEmpty() ? List.of(new SimpleGrantedAuthority("ROLE_USER")) : list;
+    }
+
+    /**
+     * Merges {@code ROLE_ADMIN} into the persisted CSV while keeping existing roles and ensuring {@code ROLE_USER}.
+     */
+    public static String grantAdminRolesCsv(String currentCsv)
+    {
+        LinkedHashSet<String> roles = new LinkedHashSet<>();
+        if (currentCsv != null && !currentCsv.isBlank())
+        {
+            Arrays.stream(currentCsv.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(RoleAuthorityMapper::normalizeRole)
+                    .forEach(roles::add);
+        }
+        roles.add("ROLE_ADMIN");
+        if (!roles.contains("ROLE_USER"))
+        {
+            roles.add("ROLE_USER");
+        }
+        return String.join(",", roles);
     }
 
     private static String normalizeRole(String raw)

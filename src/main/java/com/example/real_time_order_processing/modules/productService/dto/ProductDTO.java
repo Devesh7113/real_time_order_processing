@@ -19,6 +19,8 @@ public class ProductDTO
 
     private Integer stockQuantity;
 
+    private Integer reservedQuantity;
+
     private String category;
 
     private String imageUrl;
