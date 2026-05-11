@@ -5,10 +5,11 @@ import com.example.real_time_order_processing.modules.productService.entity.Prod
 import com.example.real_time_order_processing.modules.productService.repository.ProductRepository;
 import com.example.real_time_order_processing.modules.productService.dto.ProductCreateDTO;
 import com.example.real_time_order_processing.modules.productService.service.ProductService;
-import com.sun.jdi.request.DuplicateRequestException;
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.common.errors.ResourceNotFoundException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
@@ -38,9 +39,9 @@ public class ProductServiceImpl implements ProductService
         String sku = generateSku(request);
         Optional<Product> productOptional = productRepository.findBySku(sku);
 
-        if(productOptional.isPresent())
-        {
-            throw new DuplicateRequestException("Product already present with this name and same category.");
+        if (productOptional.isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Product already present with this name and same category.");
         }
 
         try
