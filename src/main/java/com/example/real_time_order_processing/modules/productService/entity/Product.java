@@ -46,6 +46,6 @@ public class Product
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @Column(name = "reserved_quantity")
-    private Integer reservedQuantity;
+    @Column(name = "reserved_quantity", nullable = false)
+    private Integer reservedQuantity = 0;
 }

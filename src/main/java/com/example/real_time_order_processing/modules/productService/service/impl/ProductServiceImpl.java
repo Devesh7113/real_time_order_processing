@@ -54,6 +54,7 @@ public class ProductServiceImpl implements ProductService
             product.setCategory(request.getCategory());
             product.setImageUrl(request.getImageUrl());
             product.setSku(sku);
+            product.setReservedQuantity(0);
 
             productRepository.save(product);
 
