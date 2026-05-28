@@ -1,78 +1,77 @@
 package com.example.real_time_order_processing.client;
 
-import com.example.real_time_order_processing.config.InventoryProperties;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.server.ResponseStatusException;
 
-@Slf4j
 @Service
-@RequiredArgsConstructor
+@Slf4j
 public class InventoryWakeService
 {
-    private final RestClient.Builder restClientBuilder;
-    private final InventoryProperties inventoryProperties;
+    private final RestClient restClient;
+    private final String healthUrl;
+    private final long wakeTimeoutSeconds;
+    private final long retryIntervalMs;
+
+    public InventoryWakeService(
+            @Value("${app.inventory.base-url}") String inventoryBaseUrl,
+            @Value("${app.inventory.wake-timeout-seconds}") long wakeTimeoutSeconds,
+            @Value("${app.inventory.wake-retry-interval-ms}") long retryIntervalMs)
+    {
+        this.healthUrl = inventoryBaseUrl.replaceAll("/$", "") + "/health";
+        this.wakeTimeoutSeconds = wakeTimeoutSeconds;
+        this.retryIntervalMs = retryIntervalMs;
+        this.restClient = RestClient.create();
+    }
 
     /**
-     * Calls inventory /health until it responds or timeout. Wakes Render free-tier instances.
+     * Pings inventory /health on a background thread so callers are not blocked.
      */
+    @Async
     public void ensureAwake()
     {
-        String baseUrl = inventoryProperties.getBaseUrl().replaceAll("/$", "");
-        RestClient client = restClientBuilder.baseUrl(baseUrl).build();
-
-        long deadlineMs = System.currentTimeMillis() + inventoryProperties.getWakeTimeoutSeconds() * 1000L;
+        log.info("Starting async inventory wake via {}", healthUrl);
+        long deadline = System.currentTimeMillis() + wakeTimeoutSeconds * 1000L;
         int attempt = 0;
 
-        while (System.currentTimeMillis() < deadlineMs)
+        while (System.currentTimeMillis() < deadline)
         {
             attempt++;
             try
             {
-                client.get()
-                        .uri("/health")
+                ResponseEntity<String> response = restClient.get()
+                        .uri(healthUrl)
                         .retrieve()
-                        .toBodilessEntity();
-                log.info("Inventory service ready at {} (attempt {})", baseUrl, attempt);
-                return;
-            }
-            catch (RestClientResponseException e)
-            {
-                log.warn("Inventory /health returned {} (attempt {})", e.getStatusCode(), attempt);
+                        .toEntity(String.class);
+
+                if (response.getStatusCode().is2xxSuccessful())
+                {
+                    log.info("Inventory service is awake after {} attempt(s), status={}",
+                            attempt, response.getStatusCode());
+                    return;
+                }
+                log.debug("Inventory health attempt {} returned status {}", attempt, response.getStatusCode());
             }
             catch (Exception e)
             {
-                log.debug("Inventory not ready yet (attempt {}): {}", attempt, e.getMessage());
+                log.debug("Inventory health attempt {} failed: {}", attempt, e.getMessage());
             }
 
-            long remainingMs = deadlineMs - System.currentTimeMillis();
-            if (remainingMs <= 0)
-            {
-                break;
-            }
-
-            long sleepMs = Math.min(inventoryProperties.getWakeRetryIntervalMs(), remainingMs);
             try
             {
-                Thread.sleep(sleepMs);
+                Thread.sleep(retryIntervalMs);
             }
             catch (InterruptedException e)
             {
                 Thread.currentThread().interrupt();
-                throw new ResponseStatusException(
-                        HttpStatus.SERVICE_UNAVAILABLE,
-                        "Interrupted while waiting for inventory service");
+                log.warn("Inventory wake interrupted after {} attempt(s)", attempt);
+                return;
             }
         }
 
-        log.error("Inventory service did not become ready at {} within {}s",
-                baseUrl, inventoryProperties.getWakeTimeoutSeconds());
-        throw new ResponseStatusException(
-                HttpStatus.SERVICE_UNAVAILABLE,
-                "Inventory service is starting. Please try again in a moment.");
+        log.warn("Inventory wake timed out after {}s ({} attempts)", wakeTimeoutSeconds, attempt);
     }
 }
