@@ -8,8 +8,10 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
@@ -44,7 +46,8 @@ public class UserInfoService implements UserDetailsService
 
         if(optionalUserInfo.isPresent())
         {
-            throw new RuntimeException("Account already present with this user name or email.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Account already present with this user email.");
         }
 
         userInfo.setPassword(encoder.encode(userInfo.getPassword()));

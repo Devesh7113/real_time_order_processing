@@ -10,7 +10,6 @@ import com.example.real_time_order_processing.modules.orderService.entity.Order;
 import com.example.real_time_order_processing.modules.orderService.entity.OrderItem;
 import com.example.real_time_order_processing.modules.orderService.repository.OrderItemRepository;
 import com.example.real_time_order_processing.modules.orderService.repository.OrderRepository;
-import com.example.real_time_order_processing.client.InventoryWakeService;
 import com.example.real_time_order_processing.modules.orderService.service.OrderService;
 import com.example.real_time_order_processing.modules.productService.entity.Product;
 import com.example.real_time_order_processing.modules.productService.repository.ProductRepository;
@@ -42,11 +41,7 @@ public class OrderServiceImpl implements OrderService
 
     private final UserInfoRepository userInfoRepository;
 
-    private final ProductRepository productRepository;
-
     private final KafkaTemplate<String, Object> kafkaTemplate;
-
-    private final InventoryWakeService inventoryWakeService;
 
     @Override
     public List<OrderDTO> getAllOrder()
@@ -156,7 +151,6 @@ public class OrderServiceImpl implements OrderService
 
     void processInventory(InventoryProcessRequest productList)
     {
-        inventoryWakeService.ensureAwake();
         kafkaTemplate.send("process-inventory", productList);
     }
 
